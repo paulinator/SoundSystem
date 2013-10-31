@@ -11,8 +11,6 @@ using Microsoft.Xna.Framework.Media;
 
 namespace PThomann.Utilities.SoundSystem
 {
-	public delegate bool BoolDelegate();
-
 	/// <summary>
 	/// Tool class that helps with audio for Silverlight for Windows Phone Apps.
 	/// This class behaves according to validation requirements regarding music,
@@ -45,8 +43,8 @@ namespace PThomann.Utilities.SoundSystem
 
 		#region private
 
-		static string loadedMusicFileUri;
-		static TimeSpan musicStart;
+		private static string loadedMusicFileUri;
+		private static TimeSpan musicStart;
 
 		private static object threadLock = new Object();  // to be used in all public code for locking
 
@@ -55,20 +53,22 @@ namespace PThomann.Utilities.SoundSystem
 
 		private static bool canPlay, entered, resumeMediaPlayerAfterDone;
 		private static Dictionary<string, SoundEffect> effects = new Dictionary<string, SoundEffect>();
-		private static BoolDelegate askUserDelegate;
+		private static Func<bool> askUserFunc;
 		private static GameTimer gameTimer;
+
+		private static Duration zero = new Duration(TimeSpan.FromSeconds(0));
 
 		private static bool askUser()
 		{
-			if (askUserDelegate != null)
-				return askUserDelegate.Invoke();
+			if (askUserFunc != null)
+				return askUserFunc.Invoke();
 			else
 				return (MessageBoxResult.OK == MessageBox.Show(
 					"You are currently playing music from your library.\r\n\r\nDo you wish to pause the music in order to listen to the games own music?\r\n\r\nPress Cancel if you wish to continue listening to the current music while playing.",
 					"Music Choice", MessageBoxButton.OKCancel));
 		}
 
-		static void music_MediaOpened(object sender, RoutedEventArgs e)
+		private static void music_MediaOpened(object sender, RoutedEventArgs e)
 		{
 			if (music.CanSeek)
 				music.Position = musicStart;
@@ -90,7 +90,7 @@ namespace PThomann.Utilities.SoundSystem
 			}
 		}
 
-		static void music_MarkerReached(object sender, TimelineMarkerRoutedEventArgs e)
+		private static void music_MarkerReached(object sender, TimelineMarkerRoutedEventArgs e)
 		{
 			Action<TimelineMarker> ma = MarkerReachedAction;
 			if (ma != null)
@@ -122,10 +122,10 @@ namespace PThomann.Utilities.SoundSystem
 		/// In order for your app to pass validation, any delegate you set this to
 		/// must get feedback from the user if they want to interrupt the music for the app.
 		/// </summary>
-		public static BoolDelegate AskUserDelegate
+		public static Func<bool> AskUserDelegate
 		{
-			get { lock (threadLock) { return askUserDelegate; } }
-			set { lock (threadLock) { askUserDelegate = value; } }
+			get { lock (threadLock) { return askUserFunc; } }
+			set { lock (threadLock) { askUserFunc = value; } }
 		}
 
 		/// <summary>
@@ -270,12 +270,11 @@ namespace PThomann.Utilities.SoundSystem
 					return;
 				entered = true;
 
-				// Pause the Zune player if it is already playing music.
-				// TODO: ask user if music playing from the library can be stopped
-				if (!MediaPlayer.GameHasControl)
+				if (MediaPlayer.GameHasControl)
+					canPlay = true;
+				else
 				{
-					bool b = askUser();
-					if (b)
+					if (askUser())
 					{
 						canPlay = true;
 						MediaPlayer.Pause();
@@ -287,8 +286,6 @@ namespace PThomann.Utilities.SoundSystem
 						canPlay = false;
 					}
 				}
-				else // (MediaPlayer.GameHasControl)
-					canPlay = true;
 
 				if (canPlay)
 				{
@@ -307,22 +304,16 @@ namespace PThomann.Utilities.SoundSystem
 		}
 
 		/// <summary>
-		/// This is the same as Enter(), but disables user prompt if force is true.
-		/// Useful if you implement your own user prompt which is non-blocking.
-		/// You'd call Enter(), return false upon showing your prompt via AskUserDelegate, 
-		/// and later call Enter(true) when and if the user decides so.
-		/// If you use this to avoid asking the User, your app will be rejected by Microsoft.
+		/// This is the same as Enter(), but doesn't actually ask the user.
+		/// Instead, it uses 'force' as answer.
 		/// </summary>
-		/// <param name="force">assume the user said YES?</param>
+		/// <param name="force">what did / would the user say?</param>
 		public static void Enter(bool force)
 		{
-			BoolDelegate tmp = askUserDelegate;
-			if (force)
-			{
-				askUserDelegate = () => { return true; };
-			}
+			var tmp = askUserFunc;
+			askUserFunc = () => { return force; };
 			Enter();
-			askUserDelegate = tmp;
+			askUserFunc = tmp;
 		}
 		/// <summary>
 		/// Closes the resources used to play sound and 
@@ -358,7 +349,7 @@ namespace PThomann.Utilities.SoundSystem
 		{
 			lock (threadLock)
 			{
-				if (canPlay && music.NaturalDuration > new Duration(TimeSpan.FromSeconds(0)))
+				if (canPlay && music.NaturalDuration > zero)
 					music.Play();
 			}
 		}
@@ -420,7 +411,7 @@ namespace PThomann.Utilities.SoundSystem
 		}
 
 		/// <summary>
-		/// Pauses playback and resmembers the surrent position.
+		/// Pauses playback and remembers the current position.
 		/// </summary>
 		public static void PauseMusic()
 		{
@@ -542,8 +533,9 @@ namespace PThomann.Utilities.SoundSystem
 					}
 					catch (NullReferenceException)
 					{
-						// Display an error message
+						// TODO: ONLY IF DEBUG! Display an error message
 						MessageBox.Show("Couldn't load sound from " + s);
+
 						return null;
 					}
 				}
