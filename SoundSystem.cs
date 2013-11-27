@@ -28,17 +28,21 @@ namespace PThomann.Utilities.SoundSystem
 			music.MediaEnded += music_MediaEnded;
 			music.MarkerReached += music_MarkerReached;
 
-			// Timer to simulate the XNA game loop (SoundEffect class is from the XNA Framework)
-			gameTimer = new GameTimer();
-			gameTimer.UpdateInterval = TimeSpan.FromMilliseconds(33);
+			//////// The GameTimer is NOT needed, BUT FrameworkDispatcher.Update().
 
-			// Call FrameworkDispatcher.Update to update the XNA Framework internals.
-			gameTimer.Update += delegate { try { FrameworkDispatcher.Update(); } catch { } };
+			//// Timer to simulate the XNA game loop (SoundEffect class is from the XNA Framework)
+			//gameTimer = new GameTimer();
+			//gameTimer.UpdateInterval = TimeSpan.FromMilliseconds(33);
+
+			//// Call FrameworkDispatcher.Update to update the XNA Framework internals.
+			//gameTimer.Update += delegate { try { FrameworkDispatcher.Update(); } catch { } };
 			
-			gameTimer.Start();
+			//gameTimer.Start();
 
-			// Prime the pump or we'll get an exception.
+			// Prime the pump or we'll get an exception when trying to play SoundEffects.
 			FrameworkDispatcher.Update();
+
+			//gameTimer.Stop(); 
 		}
 
 		#region private
@@ -54,7 +58,7 @@ namespace PThomann.Utilities.SoundSystem
 		private static bool canPlay, entered, resumeMediaPlayerAfterDone;
 		private static Dictionary<string, SoundEffect> effects = new Dictionary<string, SoundEffect>();
 		private static Func<bool> askUserFunc;
-		private static GameTimer gameTimer;
+		// private static GameTimer gameTimer;
 
 		private static Duration zero = new Duration(TimeSpan.FromSeconds(0));
 
@@ -64,7 +68,7 @@ namespace PThomann.Utilities.SoundSystem
 				return askUserFunc.Invoke();
 			else
 				return (MessageBoxResult.OK == MessageBox.Show(
-					"You are currently playing music from your library.\r\n\r\nDo you wish to pause the music in order to listen to the games own music?\r\n\r\nPress Cancel if you wish to continue listening to the current music while playing.",
+					"Pause Zune playback and play app music?",
 					"Music Choice", MessageBoxButton.OKCancel));
 		}
 
@@ -264,6 +268,7 @@ namespace PThomann.Utilities.SoundSystem
 		/// </summary>
 		public static void Enter()
 		{
+			// Hello
 			lock (threadLock)
 			{
 				if (entered)
@@ -336,8 +341,8 @@ namespace PThomann.Utilities.SoundSystem
 				if (popup != null)
 					popup.IsOpen = false;
 				canPlay = false;
-				resumeMediaPlayerAfterDone = false;
-				gameTimer.Stop(); 
+				// resumeMediaPlayerAfterDone = false;	// for what?
+				//gameTimer.Stop(); 
 			}
 		}
 
