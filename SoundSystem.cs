@@ -16,33 +16,14 @@ namespace PThomann.Utilities.SoundSystem
 	/// This class behaves according to validation requirements regarding music,
 	/// ie. on Enter() it asks the users whether they want to stop playback if music is already running.
 	/// Uses MediaElement for playing music, and Xna SoundEffect to play Effects.
-	/// Creates an Xna game timer on Enter() and stops it on Leave().
 	/// SoundEffects are stored for reuse and can be 'manually' unloaded.
 	/// </summary>
 	public static class SoundSystem
 	{
 		static SoundSystem()
 		{
-			music = new MediaElement();
-			music.MediaOpened += music_MediaOpened;
-			music.MediaEnded += music_MediaEnded;
-			music.MarkerReached += music_MarkerReached;
-
-			//////// The GameTimer is NOT needed, BUT FrameworkDispatcher.Update().
-
-			//// Timer to simulate the XNA game loop (SoundEffect class is from the XNA Framework)
-			//gameTimer = new GameTimer();
-			//gameTimer.UpdateInterval = TimeSpan.FromMilliseconds(33);
-
-			//// Call FrameworkDispatcher.Update to update the XNA Framework internals.
-			//gameTimer.Update += delegate { try { FrameworkDispatcher.Update(); } catch { } };
-			
-			//gameTimer.Start();
-
-			// Prime the pump or we'll get an exception when trying to play SoundEffects.
+			// No GameTimer is needed, BUT FrameworkDispatcher.Update() has to be called once, or we'll get an exception when trying to play SoundEffects.
 			FrameworkDispatcher.Update();
-
-			//gameTimer.Stop(); 
 		}
 
 		#region private
@@ -61,6 +42,18 @@ namespace PThomann.Utilities.SoundSystem
 		// private static GameTimer gameTimer;
 
 		private static Duration zero = new Duration(TimeSpan.FromSeconds(0));
+
+		private static bool playerCreated;
+		private static void CreateMusicPlayer()
+		{
+			if (playerCreated)
+				return;
+			playerCreated = true;
+			music = new MediaElement();
+			music.MediaOpened += music_MediaOpened;
+			music.MediaEnded += music_MediaEnded;
+			music.MarkerReached += music_MarkerReached;
+		}
 
 		private static bool askUser()
 		{
@@ -93,7 +86,6 @@ namespace PThomann.Utilities.SoundSystem
 				}
 			}
 		}
-
 		private static void music_MarkerReached(object sender, TimelineMarkerRoutedEventArgs e)
 		{
 			Action<TimelineMarker> ma = MarkerReachedAction;
@@ -296,6 +288,7 @@ namespace PThomann.Utilities.SoundSystem
 				{
 					if (popup == null)
 					{
+						CreateMusicPlayer();
 						popup = new Popup();
 						popup.Child = music;
 						popup.Opacity = 0;
@@ -311,6 +304,8 @@ namespace PThomann.Utilities.SoundSystem
 		/// <summary>
 		/// This is the same as Enter(), but doesn't actually ask the user.
 		/// Instead, it uses 'force' as answer.
+		/// 
+		/// If you use this to avoid actually asking the user when you should, your app will probably be rejected.
 		/// </summary>
 		/// <param name="force">what did / would the user say?</param>
 		public static void Enter(bool force)
@@ -320,6 +315,7 @@ namespace PThomann.Utilities.SoundSystem
 			Enter();
 			askUserFunc = tmp;
 		}
+
 		/// <summary>
 		/// Closes the resources used to play sound and 
 		/// if appropriate continues Zune where it was before starting the app.
